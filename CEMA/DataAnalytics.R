@@ -1,93 +1,111 @@
-# Load necessary libraries
+install.packages("lm34")
+install.packages("tidyverse")
+
+#Loading necessary libraries
+library(tidyverse)
+library(lme4)
+library(broom)
 library(dplyr)
-library(ggplot2)
 library(readr)
-install.packages("zoo")
-library(zoo)
+library(car)
+library(ggplot2)
+library(caret)
 
-
-# Load the dataset
+# Step 1: Load the dataset
 data_url <- "https://raw.githubusercontent.com/cema-uonbi/L4H_sample_data/main/ideal3a.csv"
 ideal_data <- read_csv(data_url)
 
-# Check the structure of the dataset
-str(ideal_data)
-
+# Step 2: Data Preparation
 # Set ReasonsLoss to 0 where ReasonLoss1 indicates survival
 ideal_data$ReasonsLoss[ideal_data$ReasonsLoss1 == "survived"] <- 0
+# Convert 'ReasonsLoss1' to binary (1 = died, 0 = survived)
+ideal_data$ReasonsLoss1 <- ifelse(ideal_data$ReasonsLoss1 == "died", 1, 0)
 
-# Drop rows with missing values in ELISA_mutans or ELISA_parva
-ideal_data <- ideal_data[!is.na(ideal_data$ELISA_mutans) & !is.na(ideal_data$ELISA_parva), ]
+# Check the unique values of ReasonsLoss1
+print(unique(ideal_data$ReasonsLoss1))
 
-# Calculate the mean of ManualPCV for the specific CalfID
-mean_manualPCV <- mean(ideal_data$ManualPCV[ideal_data$CalfID == "CA031210334"], na.rm = TRUE)
+# Check counts of each category
+print(table(ideal_data$ReasonsLoss1))
 
-
-# Fill missing Weight based on CalfID
-ideal_data <- ideal_data %>%
-  group_by(CalfID) %>%
-  mutate(Weight = ifelse(is.na(Weight), mean(Weight, na.rm = TRUE), Weight)) %>%
-  ungroup()
-
-# Fill missing Q.Strongyle.eggs using last observation carried forward (LOCF)
-ideal_data <- ideal_data %>%
-  arrange(VisitDate) %>%
-  mutate(Q.Strongyle.eggs = na.locf(Q.Strongyle.eggs, na.rm = FALSE))
-
-# Fill missing Weight based on CalfID, sublocation, and VisitDate
-ideal_data <- ideal_data %>%
-  group_by(CalfID) %>%
-  mutate(Q.Strongyle.eggs = ifelse(is.na(Q.Strongyle.eggs), mean(Q.Strongyle.eggs, na.rm = TRUE), Q.Strongyle.eggs)) %>%
-  ungroup()
-
-
-# Convert selected variables to factors
-ideal_data$ELISA_mutans <- as.factor(ideal_data$ELISA_mutans)
-ideal_data$ELISA_parva <- as.factor(ideal_data$ELISA_parva)
-ideal_data$Theileria.spp. <- as.factor(ideal_data$Theileria.spp.)
+# Convert categorical variables to factors
 ideal_data$CalfSex <- as.factor(ideal_data$CalfSex)
-ideal_data$ReasonsLoss1 <- as.factor(ideal_data$ReasonsLoss1)
-ideal_data$ReasonsLoss <- as.factor(ideal_data$ReasonsLoss)
-ideal_data$sublocation <- as.factor(ideal_data$sublocation)
+ideal_data$Education <- as.factor(ideal_data$Education)
 ideal_data$Distance_water <- as.factor(ideal_data$Distance_water)
 
-# Check for missing values
-summary(ideal_data)
+# Handle missing values (e.g., imputation or removal)
+# Here, we simply drop rows with NA values for simplicity
+ideal_data <- na.omit(ideal_data)
 
 
-# Conduct logistic regression with ReasonsLoss1 as the target variable
-logit_model <- glm(ReasonsLoss1 ~ ELISA_mutans + ELISA_parva + Theileria.spp. + 
-                     CalfSex + Distance_water + RecruitWeight + Weight + 
-                     ManualPCV + Age + sublocation, 
-                   data = ideal_data, family = binomial)
+# Visualize the distribution of the target variable
+ggplot(ideal_data, aes(x = as.factor(ReasonsLoss1))) + 
+  geom_bar() + 
+  labs(x = "Reasons Loss (0 = Survived, 1 = Died)", y = "Count") +
+  theme_minimal()
 
-summary(logit_model)
+# Fit a preliminary model to check multicollinearity
+vif_model <- glm(ReasonsLoss1 ~ CalfSex + Education + Distance_water + RecruitWeight + 
+                   Age + ManualPCV + Theileria.spp. + ELISA_mutans + ELISA_parva + 
+                   Q.Strongyle.eggs, 
+                 family = binomial(link = "logit"), 
+                 data = ideal_data)
 
-install.packages("broom")
-library(broom)
-# Step 4: Tidy up the results for easier interpretation
-tidy_results <- tidy(logit_model)
+# Check VIF values
+vif_values <- vif(vif_model)
+print(vif_values)
 
-# Print all rows of tidy_results
-print(tidy_results, n = Inf)
 
-install.packages("pROC")
+library(smotefamily)
 
-library(pROC)
-# Load necessary package
+# Apply SMOTE to handle class imbalance
+set.seed(123)  # Set seed for reproducibility
+# The smote function uses a slightly different syntax
+smote_data <- SMOTE(ReasonsLoss1 ~ CalfSex + Education + Distance_water + RecruitWeight + 
+                      Age + ManualPCV + Theileria.spp. + ELISA_mutans + ELISA_parva + 
+                      Q.Strongyle.eggs, 
+                    data = ideal_data, perc.over = 100, k = 5)  # `k` is the number of nearest neighbors
+
+# Check the distribution after SMOTE
+print(table(smote_data$ReasonsLoss1))
+
+
+
+
+# Check the distribution after applying SMOTE
+print(table(balanced_data$ReasonsLoss1))
+
+# Split the data into training and testing sets (80% training, 20% testing)
+train_index <- createDataPartition(ideal_data$ReasonsLoss1, p = 0.8, list = FALSE)
+train_data <- ideal_data[train_index, ]
+test_data <- ideal_data[-train_index, ]
+
+
+# Fit the logistic regression model
+model <- glm(ReasonsLoss1 ~ CalfSex + Education + Distance_water + RecruitWeight + 
+               Age + ManualPCV + Theileria.spp. + ELISA_mutans + ELISA_parva + 
+               Q.Strongyle.eggs, 
+             family = binomial(link = "logit"), 
+             data = train_data)
+
+# Summary of the model
+summary(model)
+
+# Make predictions on the test data
+test_data$predicted_prob <- predict(model, newdata = test_data, type = "response")
+
+# Classify predictions based on a threshold (commonly 0.5)
+test_data$predicted_class <- ifelse(test_data$predicted_prob > 0.5, 1, 0)
+
+
+# Load necessary library for confusion matrix
 library(caret)
 
-# ROC Curve and AUC
-roc_curve <- roc(ideal_data$ReasonsLoss1, predicted_probabilities)
-plot(roc_curve)
-auc_value <- auc(roc_curve)
-print(auc_value)
+# Confusion matrix
+confusion_matrix <- confusionMatrix(as.factor(test_data$predicted_class), as.factor(test_data$ReasonsLoss1))
+print(confusion_matrix)
 
-# Sensitivity and Specificity
-sensitivity <- confusion_matrix$byClass["Sensitivity"]
-specificity <- confusion_matrix$byClass["Specificity"]
-print(sensitivity)
-print(specificity)
-
+# Additional performance metrics
+accuracy <- sum(test_data$predicted_class == test_data$ReasonsLoss1) / nrow(test_data)
+cat("Accuracy:", accuracy, "\n")
 
 

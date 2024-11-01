@@ -1,6 +1,6 @@
 setwd("C:/Users/Anarchy/Documents/Data_Science/CEMA/L4H_sample_data-main")
-install.packages(c("dplyr", "janitor", "lubridate"))
-install.packages("readr")
+#install.packages(c("dplyr", "janitor", "lubridate"))
+#install.packages("readr")
 
 library(readr)
 library(dplyr)
@@ -30,7 +30,7 @@ merged_data <- baseline_individual %>%
 final_data <- merged_data %>% 
   inner_join(baseline_household_filtered, by = "household_id")
 
-View(final_data)
+#View(final_data)
 
 str(final_data)
 
@@ -38,12 +38,10 @@ str(final_data)
 colnames(final_data)
 
 # Select the columns of interest
-columns_of_interest <- c("reason_for_ineligibility", "rspntgndr", "rspndtmarital", "rspndt_eductn", "maincme")
+columns_of_interest <- c("reason_for_ineligibility", "rspntgndr", "h_hfrml_eductn", "rspndtmarital", "rspndt_eductn", "maincme")
 
 # Display the first 10 entries for these columns
 head(final_data[columns_of_interest], 20)
-
-# Couldn't find column for H_hfrml_eductn
 
 unique(final_data$reason_for_ineligibility)
 unique(final_data$rspntgndr)
@@ -56,46 +54,58 @@ unique(final_data$maincme)
 # Recode the variables using the mappings from the data dictionary
 final_data <- final_data %>%
   mutate(
-    reason_for_ineligibility = recode(reason_for_ineligibility,
-                                    `1` = "No adult occupier >16 years",
-                                    `2` = "Withdrawal",
-                                    `3` = "Other reason"),
+    reason_for_ineligibility = case_when(
+      reason_for_ineligibility == "1" ~ "No adult occupier >16 years",
+      reason_for_ineligibility == "2" ~ "Withdrawal",
+      reason_for_ineligibility == "3" ~ "Other reason",
+      TRUE ~ "---"  # Default for unmatched cases
+    ),
     
-    rspntgndr = recode(rspntgndr,
-                       `1` = "Male",
-                       `2` = "Female"),
+    rspntgndr = case_when(
+      rspntgndr == "1" ~ "Male",
+      rspntgndr == "2" ~ "Female",
+      TRUE ~ "---"
+    ),
     
-    h_hfrml_eductn = recode(h_hfrml_eductn,
-                            `1` = "No formal education",
-                            `2` = "Primary School",
-                            `3` = "Secondary school",
-                            `4` = "College-graduate",
-                            `5` = "Madrassa",
-                            `6` = "Other"),
+    h_hfrml_eductn = case_when(
+      h_hfrml_eductn == "1" ~ "No formal education",
+      h_hfrml_eductn == "2" ~ "Primary School",
+      h_hfrml_eductn == "3" ~ "Secondary school",
+      h_hfrml_eductn == "4" ~ "College-graduate",
+      h_hfrml_eductn == "5" ~ "Madrassa",
+      h_hfrml_eductn == "6" ~ "Other",
+      TRUE ~ "---"
+    ),
     
-    rspndtmarital = recode(rspndtmarital,
-                           `1` = "Single",
-                           `2` = "Married monogamous",
-                           `3` = "Married polygamous",
-                           `4` = "Divorced/separated",
-                           `5` = "Widow(er)"),
+    rspndtmarital = case_when(
+      rspndtmarital == "1" ~ "Single",
+      rspndtmarital == "2" ~ "Married monogamous",
+      rspndtmarital == "3" ~ "Married polygamous",
+      rspndtmarital == "4" ~ "Divorced/separated",
+      rspndtmarital == "5" ~ "Widow(er)",
+      TRUE ~ "---"
+    ),
     
-    rspndt_eductn = recode(rspndt_eductn,
-                           `1` = "No formal education",
-                           `2` = "Primary School",
-                           `3` = "Secondary school",
-                           `4` = "College-graduate",
-                           `5` = "Madrassa",
-                           `6` = "Other"),
+    rspndt_eductn = case_when(
+      rspndt_eductn == "1" ~ "No formal education",
+      rspndt_eductn == "2" ~ "Primary School",
+      rspndt_eductn == "3" ~ "Secondary school",
+      rspndt_eductn == "4" ~ "College-graduate",
+      rspndt_eductn == "5" ~ "Madrassa",
+      rspndt_eductn == "6" ~ "Other",
+      TRUE ~ "---"
+    ),
     
-    maincme = recode(maincme,
-                     `1` = "Sale of livestock & livestock products",
-                     `2` = "Sale of crops",
-                     `3` = "Trading/business",
-                     `4` = "Employment (salaried income)",
-                     `5` = "Sale of personal assets",
-                     `6` = "Remittance",
-                     `7` = "Other")
+    maincme = case_when(
+      maincme == "1" ~ "Sale of livestock & livestock products",
+      maincme == "2" ~ "Sale of crops",
+      maincme == "3" ~ "Trading/business",
+      maincme == "4" ~ "Employment (salaried income)",
+      maincme == "5" ~ "Sale of personal assets",
+      maincme == "6" ~ "Remittance",
+      maincme == "7" ~ "Other",
+      TRUE ~ "---"
+    )
   )
 
 # Check unique values for verification
@@ -108,7 +118,7 @@ unique(final_data$maincme)
 
 unique(final_data$lvstckown)
 
-install.packages("tidyr")
+#install.packages("tidyr")
 library(tidyr)
 
 
@@ -121,6 +131,7 @@ unique(final_data$herdynamics)
 # Separate the herdynamics column into individual response columns
 final_data <- final_data %>%
   separate(herdynamics, into = paste0("herdynamics_", 1:7), sep = " ", fill = "right", remove = TRUE)
+
 
 # Display the first few rows of the updated dataset
 head(final_data)
@@ -217,7 +228,7 @@ animal_summary <- herd_dynamics %>%
     .groups = 'drop'  # Ungroup after summarizing
   )
 
-print(animal_summary)
+print(animal_summary, n = Inf)
 
 # Create a subset of the dataset with the specified variables
 subset_herd_dynamics <- animal_summary %>%
@@ -248,13 +259,13 @@ str(subset_herd_dynamics)
 
 summary(subset_herd_dynamics)
 
-View(subset_herd_dynamics)
+#View(subset_herd_dynamics)
 
 
 # Print the first few rows of the subset to verify
 head(subset_herd_dynamics)
 
-install.packages("ggplot2")
+
 library(ggplot2)
 
 # Reshape the data to long format
@@ -268,11 +279,12 @@ long_data <- subset_herd_dynamics %>%
     names_pattern = "(.*)_(.*)",
     values_to = "count"
   ) %>%
-  mutate(event = recode(event,
-                        'born' = 'Births',
-                        'died' = 'Deaths',
-                        'gifted' = 'Gifts In',
-                        'given' = 'Gifts Out')) %>%
+  mutate(event = case_when(
+    event == 'born' ~ 'Births',
+    event == 'died' ~ 'Deaths',
+    event == 'gifted' ~ 'Gifts In',
+    event == 'given' ~ 'Gifts Out'
+  )) %>%
   drop_na(count)  # Remove NA counts for cleaner plotting
 
 # Create the plot

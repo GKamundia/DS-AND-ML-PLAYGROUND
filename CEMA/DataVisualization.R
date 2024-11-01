@@ -29,6 +29,13 @@ str(kenya_merged)
 # Check for any NA values in the merged dataset
 summary(kenya_merged)
 
+# Handle missing values in the Ever_pregnant column
+kenya_merged <- kenya_merged %>%
+  mutate(Ever_pregnant = ifelse(is.na(Ever_pregnant), 0, Ever_pregnant))
+
+# Check for any NA values in the merged dataset
+summary(kenya_merged)
+
 # Create a map showing the percentage of teenagers who have ever been pregnant by county
 ggplot(data = kenya_merged) +
   geom_sf(aes(fill = Ever_pregnant), color = "white") +  # Fill by Ever_pregnant
